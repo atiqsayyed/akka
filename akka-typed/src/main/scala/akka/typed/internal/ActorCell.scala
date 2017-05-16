@@ -289,29 +289,19 @@ private[typed] class ActorCell[T](
       }
     }
 
-    try {
-      unscheduleReceiveTimeout()
-      if (!isTerminated(status))
-        process()
-      scheduleReceiveTimeout()
-    } catch {
-      case NonFatal(ex) ⇒ fail(ex)
-      case ie: InterruptedException ⇒
-        fail(ie)
-        if (Debug) println(s"[$thread] $self interrupting due to catching InterruptedException")
-        Thread.currentThread.interrupt()
-    } finally {
+    // Returns `true` if it should be rescheduled.
+    // This method shouldn't throw apart from fatal errors.
+    def postProcess(): Boolean = {
       // also remove the general activation token
       processed += 1
       val prev = unsafe.getAndAddInt(this, statusOffset, -processed)
       val now = prev - processed
       if (isTerminated(now)) {
-        // we’re finished
+        false // we’re finished, don't reschedule
       } else if (activations(now) > 0) {
         // normal messages pending: reverse the deactivation
         unsafe.getAndAddInt(this, statusOffset, 1)
-        // ... and reschedule
-        executionContext.execute(this)
+        true // ... and reschedule
       } else if (_systemQueue.head != null) {
         /*
          * System message was enqueued after our last processing, we now need to
@@ -322,10 +312,39 @@ private[typed] class ActorCell[T](
          * activation token again.
          */
         val again = unsafe.getAndAddInt(this, statusOffset, 1)
-        if (activations(again) == 0) executionContext.execute(this)
-        else unsafe.getAndAddInt(this, statusOffset, -1)
+        if (activations(again) == 0) true //reschedule
+        else {
+          unsafe.getAndAddInt(this, statusOffset, -1)
+          false // don't reschedule
+        }
+      } else {
+        false // don't reschedule
       }
     }
+
+    val reschedule =
+      try {
+        unscheduleReceiveTimeout()
+        if (!isTerminated(status)) {
+          process()
+          scheduleReceiveTimeout()
+        }
+        postProcess()
+      } catch {
+        case NonFatal(ex) ⇒
+          fail(ex)
+          postProcess()
+        case ie: InterruptedException ⇒
+          fail(ie)
+          if (Debug) println(s"[$thread] $self interrupting due to catching InterruptedException")
+          Thread.currentThread.interrupt()
+          postProcess()
+      }
+    // The actual rescheduling is not performed in postProcess because
+    // it may throw and we must not run the other things in postProcess twice.
+    if (reschedule)
+      executionContext.execute(this)
+
     if (Debug) println(s"[$thread] $self exiting run(): interrupted=${Thread.currentThread.isInterrupted}")
   }
 
