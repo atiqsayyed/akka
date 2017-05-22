@@ -1193,7 +1193,7 @@ object MiMa extends AutoPlugin {
       ),
       "2.5.1" -> Seq(
         // #22881 Make sure connections are aborted correctly on Windows
-        ProblemFilters.exclude[ReversedMissingMethodProblem]("akka.io.ChannelRegistration.wakeUp"),
+        ProblemFilters.exclude[ReversedMissingMethodProblem]("akka.io.ChannelRegistration.cancel"),
 
         // #22868 store shards
         ProblemFilters.exclude[DirectMissingMethodProblem]("akka.cluster.sharding.DDataShardCoordinator.sendUpdate"),
