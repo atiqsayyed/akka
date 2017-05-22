@@ -1197,7 +1197,9 @@ object MiMa extends AutoPlugin {
           ProblemFilters.exclude[DirectMissingMethodProblem]("akka.pattern.BackoffOptionsImpl.apply"),
           ProblemFilters.exclude[DirectMissingMethodProblem]("akka.pattern.BackoffOnRestartSupervisor.this"),
           ProblemFilters.exclude[ReversedMissingMethodProblem]("akka.pattern.HandleBackoff.replyWhileStopped"),
-          ProblemFilters.exclude[ReversedMissingMethodProblem]("akka.pattern.BackoffOptions.withReplyWhileStopped")
+          ProblemFilters.exclude[ReversedMissingMethodProblem]("akka.pattern.BackoffOptions.withReplyWhileStopped"),
+          // #22881 Make sure connections are aborted correctly on Windows
+          ProblemFilters.exclude[ReversedMissingMethodProblem]("akka.io.ChannelRegistration.wakeUp")
       )
     )
 
